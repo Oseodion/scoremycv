@@ -499,6 +499,52 @@
     @keyframes fadeStep { to{opacity:1} }
     .step-dot { width:6px;height:6px;border-radius:50%;background:var(--amber); }
 
+
+    /* ── UPLOAD ZONE ── */
+    .upload-zone {
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      gap:10px;
+      background:var(--bg2);
+      border:2px dashed var(--border);
+      border-radius:10px;
+      padding:14px 16px;
+      margin-bottom:10px;
+      cursor:pointer;
+      transition:all 0.2s;
+      font-family:'Bricolage Grotesque',sans-serif;
+      font-size:0.875rem;
+      font-weight:500;
+      color:var(--muted);
+    }
+    .upload-zone:hover, .upload-zone.drag-over {
+      border-color:var(--amber);
+      background:#fffbeb;
+      color:var(--amber-dark);
+    }
+    .upload-zone.has-file {
+      border-style:solid;
+      border-color:var(--green);
+      background:#f0fdf4;
+      color:var(--green);
+    }
+    .upload-divider {
+      display:flex;
+      align-items:center;
+      gap:10px;
+      margin-bottom:10px;
+      font-family:'Bricolage Grotesque',sans-serif;
+      font-size:0.72rem;
+      color:var(--muted);
+    }
+    .upload-divider::before, .upload-divider::after {
+      content:'';
+      flex:1;
+      height:1px;
+      background:var(--border);
+    }
+
     /* ── FOOTER ── */
     .footer {
       text-align:center;
@@ -545,8 +591,8 @@
       <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
       AI-Powered Analysis
     </div>
-    <h1>Get your resume <span>job ready</span> in seconds</h1>
-    <p>Paste your resume and a job description. Claude AI will analyze the match, find keyword gaps and give you specific improvements to land more interviews.</p>
+    <h1>Get your resume <span>job-ready</span> in seconds</h1>
+    <p>Paste your resume and a job description. Claude AI will analyze the match, find keyword gaps, and give you specific improvements to land more interviews.</p>
   </div>
 
   <!-- APP -->
@@ -561,6 +607,16 @@
         </div>
       </div>
       <div class="textarea-wrap">
+        <!-- FILE UPLOAD -->
+        <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="handleDrop(event)">
+          <input type="file" id="fileInput" accept=".pdf,.txt,image/png,image/jpeg,image/jpg,image/webp" style="display:none" onchange="handleFileUpload(this)"/>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <span id="uploadLabel">Upload PDF, image (JPG/PNG) or drag &amp; drop</span>
+        </div>
+        <div id="imagePreviewWrap" style="display:none;margin-bottom:10px">
+          <img id="imagePreview" style="width:100%;max-height:180px;object-fit:contain;border-radius:8px;border:1px solid var(--border);background:var(--bg2)"/>
+        </div>
+        <div class="upload-divider"><span>or paste text below</span></div>
         <textarea id="resumeText" placeholder="Paste your full resume here — work experience, skills, education, everything..." oninput="updateCount('resumeText','resumeCount')"></textarea>
         <div class="char-count"><span id="resumeCount">0</span> characters</div>
       </div>
@@ -713,16 +769,16 @@ async function analyzeResume() {
   const resume = document.getElementById('resumeText').value.trim();
   const job = document.getElementById('jobText').value.trim();
 
-  if (!resume) { showError('Please paste your resume first.'); return; }
+  if (!resume && !uploadedImageBase64) { showError('Please upload your CV or paste the text first.'); return; }
   if (!job) { showError('Please paste the job description.'); return; }
-  if (resume.length < 100) { showError('Resume seems too short — paste the full text.'); return; }
+  if (resume && resume.length < 50) { showError('Resume text seems too short — paste the full content.'); return; }
   if (job.length < 50) { showError('Job description seems too short.'); return; }
 
   document.getElementById('errorBox').classList.remove('show');
   document.getElementById('resultsSection').classList.remove('show');
   setLoading(true);
 
-  const prompt = `You are an expert resume analyst and career coach. Analyze the resume against the job description and return a detailed JSON analysis.
+  const basePrompt = `You are an expert resume analyst and career coach. Analyze the resume against the job description and return a detailed JSON analysis.
 
 RESUME:
 ${resume}
@@ -764,21 +820,51 @@ Rules:
 - quickWins: exactly 4 quick actionable tips
 - Be specific and honest, not generic`;
 
+  // Build prompt — prepend image instruction if image uploaded
+  const prompt = uploadedImageBase64
+    ? 'The image provided is the candidate\'s CV/resume. Extract all information from it visually. ' + basePrompt.replace('RESUME:\n' + resume + '\n\n', '')
+    : basePrompt;
+
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
-        messages: [{ role: 'user', content: prompt }]
+        max_tokens: 4000,
+        messages: [{
+          role: 'user',
+          content: uploadedImageBase64
+            ? [
+                {
+                  type: 'image',
+                  source: { type: 'base64', media_type: uploadedImageType, data: uploadedImageBase64 }
+                },
+                { type: 'text', text: prompt }
+              ]
+            : prompt
+        }]
       })
     });
 
     if (!response.ok) throw new Error('API request failed: ' + response.status);
     const data = await response.json();
-    const text = data.content[0].text.replace(/```json|```/g, '').trim();
-    const result = JSON.parse(text);
+    let text = data.content[0].text;
+
+    // Extract JSON — find first { to last } in case Claude adds extra text
+    const firstBrace = text.indexOf('{');
+    const lastBrace = text.lastIndexOf('}');
+    if (firstBrace === -1 || lastBrace === -1) throw new Error('No JSON found in response');
+    text = text.slice(firstBrace, lastBrace + 1);
+
+    let result;
+    try {
+      result = JSON.parse(text);
+    } catch(parseErr) {
+      // Try to fix common JSON issues — trailing commas, etc
+      text = text.replace(/,\s*([}\]])/g, '$1');
+      result = JSON.parse(text);
+    }
 
     setLoading(false);
     renderResults(result);
@@ -948,6 +1034,150 @@ function renderResults(r) {
   setTimeout(() => animateRing(r.overallScore), 200);
   setTimeout(() => animateBars(), 300);
 }
+
+/* ─────────────────────────────
+   FILE UPLOAD — PDF + IMAGE
+───────────────────────────── */
+let uploadedImageBase64 = null;
+let uploadedImageType = null;
+
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('uploadZone').classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) processFile(file);
+}
+
+function handleFileUpload(input) {
+  const file = input.files[0];
+  if (file) processFile(file);
+}
+
+async function processFile(file) {
+  const zone = document.getElementById('uploadZone');
+  const label = document.getElementById('uploadLabel');
+  zone.classList.remove('has-file');
+  uploadedImageBase64 = null;
+  uploadedImageType = null;
+
+  // ── IMAGE FILE — send directly to Claude vision ──
+  if (file.type.startsWith('image/')) {
+    label.textContent = 'Reading image...';
+    try {
+      const base64 = await fileToBase64(file);
+      uploadedImageBase64 = base64.split(',')[1];
+      uploadedImageType = file.type;
+
+      // Show preview
+      const preview = document.getElementById('imagePreview');
+      const previewWrap = document.getElementById('imagePreviewWrap');
+      preview.src = base64;
+      previewWrap.style.display = 'block';
+
+      // Clear textarea — Claude will read from image
+      document.getElementById('resumeText').value = '';
+      document.getElementById('resumeCount').textContent = '0';
+      label.textContent = '✓ ' + file.name + ' — Claude will read this image';
+      zone.classList.add('has-file');
+    } catch(e) {
+      setUploadError('Could not load image. Please try again.');
+    }
+    return;
+  }
+
+  // ── PDF FILE ──
+  if (file.type === 'application/pdf') {
+    label.textContent = 'Loading PDF reader...';
+    try {
+      const lib = await loadPDFJS();
+      label.textContent = 'Extracting text...';
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await lib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
+
+      let fullText = '';
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const content = await page.getTextContent();
+        let lastY = null;
+        let pageText = '';
+        for (const item of content.items) {
+          if (lastY !== null && Math.abs(item.transform[5] - lastY) > 5) pageText += '\n';
+          pageText += item.str;
+          if (item.hasEOL) pageText += '\n';
+          lastY = item.transform[5];
+        }
+        fullText += pageText + '\n';
+      }
+
+      fullText = fullText.replace(/\s+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+
+      if (fullText.length < 50) throw new Error('image-based');
+
+      document.getElementById('resumeText').value = fullText;
+      updateCount('resumeText', 'resumeCount');
+      label.textContent = '✓ ' + file.name + ' (' + pdf.numPages + ' pages extracted)';
+      zone.classList.add('has-file');
+    } catch(e) {
+      const msg = e.message?.includes('image-based')
+        ? 'This PDF has no selectable text — try uploading it as an image (screenshot/JPG) instead'
+        : 'Could not read PDF — try uploading as an image or paste text below';
+      setUploadError(msg);
+    }
+    return;
+  }
+
+  // ── PLAIN TEXT ──
+  if (file.type === 'text/plain') {
+    const text = await file.text();
+    document.getElementById('resumeText').value = text;
+    updateCount('resumeText', 'resumeCount');
+    label.textContent = '✓ ' + file.name + ' loaded';
+    zone.classList.add('has-file');
+    return;
+  }
+
+  setUploadError('Unsupported file type. Upload a PDF, JPG, PNG, or paste text below.');
+}
+
+function setUploadError(msg) {
+  const zone = document.getElementById('uploadZone');
+  const label = document.getElementById('uploadLabel');
+  label.textContent = msg;
+  zone.style.borderColor = 'var(--red)';
+  zone.style.color = 'var(--red)';
+  setTimeout(() => {
+    zone.style.borderColor = '';
+    zone.style.color = '';
+    label.textContent = 'Upload PDF, image (JPG/PNG) or drag & drop';
+  }, 5000);
+}
+
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+let pdfJSLoaded = null;
+function loadPDFJS() {
+  if (pdfJSLoaded) return pdfJSLoaded;
+  pdfJSLoaded = new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js';
+    script.onload = () => {
+      // Disable worker to avoid fake worker warning in browser
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+      resolve(window.pdfjsLib);
+    };
+    script.onerror = reject;
+    document.head.appendChild(script);
+  });
+  return pdfJSLoaded;
+}
+
 </script>
 </body>
 </html>
