@@ -1,0 +1,953 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>ScoreMyCV — AI Resume Analyzer</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%23f59e0b'/><text y='22' x='7' font-size='18' fill='white'>R</text></svg>"/>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
+  <style>
+    /* ── RESET & BASE ── */
+    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+    html { scroll-behavior:smooth; }
+    body {
+      font-family:'Bricolage Grotesque',sans-serif;
+      background:#fafaf8;
+      color:#1a1a1a;
+      min-height:100vh;
+      line-height:1.6;
+    }
+
+    /* ── VARIABLES ── */
+    :root {
+      --amber:#f59e0b;
+      --amber-light:#fde68a;
+      --amber-dark:#d97706;
+      --green:#16a34a;
+      --red:#dc2626;
+      --blue:#2563eb;
+      --bg:#fafaf8;
+      --bg2:#f3f3ef;
+      --border:#e5e4df;
+      --text:#1a1a1a;
+      --muted:#6b6b5e;
+      --card:#ffffff;
+      --shadow:0 2px 16px rgba(0,0,0,0.07);
+      --shadow-lg:0 8px 40px rgba(0,0,0,0.1);
+    }
+
+    /* ── NAVBAR ── */
+    .navbar {
+      position:sticky; top:0; z-index:100;
+      background:rgba(250,250,248,0.92);
+      backdrop-filter:blur(12px);
+      border-bottom:1px solid var(--border);
+      padding:0 32px;
+      height:60px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+    }
+    .nav-logo {
+      display:flex; align-items:center; gap:10px;
+      font-family:'Bricolage Grotesque',sans-serif; font-weight:800; font-size:1.1rem;
+      color:var(--text); text-decoration:none;
+    }
+    .nav-logo-icon {
+      width:32px; height:32px;
+      background:var(--amber);
+      border-radius:8px;
+      display:flex; align-items:center; justify-content:center;
+      font-family:'Bricolage Grotesque',sans-serif; font-weight:800; font-size:1rem; color:#fff;
+    }
+    .nav-badge {
+      font-family:'Geist Mono',monospace;
+      font-size:0.65rem; font-weight:600;
+      background:var(--amber-light);
+      color:var(--amber-dark);
+      border-radius:20px;
+      padding:2px 10px;
+      letter-spacing:0.05em;
+    }
+
+    /* ── HERO ── */
+    .hero {
+      text-align:center;
+      padding:60px 24px 40px;
+      max-width:680px;
+      margin:0 auto;
+    }
+    .hero-tag {
+      display:inline-flex; align-items:center; gap:8px;
+      font-family:'Geist Mono',monospace;
+      font-size:0.72rem; font-weight:600;
+      text-transform:uppercase; letter-spacing:0.1em;
+      color:var(--amber-dark);
+      background:var(--amber-light);
+      border-radius:20px;
+      padding:5px 14px;
+      margin-bottom:20px;
+    }
+    .hero-tag svg { flex-shrink:0; }
+    .hero h1 {
+      font-family:'Bricolage Grotesque',sans-serif;
+      font-size:clamp(2rem, 5vw, 3.2rem);
+      font-weight:800;
+      line-height:1.1;
+      letter-spacing:-0.02em;
+      margin-bottom:16px;
+    }
+    .hero h1 span { color:var(--amber); }
+    .hero p {
+      font-size:1rem;
+      color:var(--muted);
+      max-width:480px;
+      margin:0 auto;
+      line-height:1.7;
+    }
+
+    /* ── MAIN LAYOUT ── */
+    .app-layout {
+      max-width:1200px;
+      margin:0 auto;
+      padding:0 24px 80px;
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:24px;
+      align-items:start;
+    }
+
+    /* ── CARDS ── */
+    .card {
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:16px;
+      box-shadow:var(--shadow);
+    }
+    .card-header {
+      padding:20px 24px 0;
+      margin-bottom:16px;
+    }
+    .card-title {
+      font-family:'Bricolage Grotesque',sans-serif;
+      font-size:0.8rem;
+      font-weight:700;
+      text-transform:uppercase;
+      letter-spacing:0.1em;
+      color:var(--muted);
+      display:flex;
+      align-items:center;
+      gap:8px;
+    }
+    .card-title svg { color:var(--amber); }
+
+    /* ── TEXTAREAS ── */
+    .textarea-wrap { padding:0 24px 24px; }
+    textarea {
+      width:100%;
+      background:var(--bg2);
+      border:1.5px solid var(--border);
+      border-radius:10px;
+      color:var(--text);
+      font-family:'Bricolage Grotesque',sans-serif;
+      font-size:0.875rem;
+      line-height:1.7;
+      padding:14px 16px;
+      resize:vertical;
+      outline:none;
+      transition:border-color 0.2s;
+      min-height:220px;
+    }
+    textarea:focus { border-color:var(--amber); }
+    textarea::placeholder { color:var(--muted); font-style:italic; }
+    .char-count {
+      font-family:'Geist Mono',monospace;
+      font-size:0.7rem;
+      color:var(--muted);
+      text-align:right;
+      margin-top:6px;
+    }
+
+    /* ── ANALYZE BUTTON ── */
+    .analyze-wrap {
+      grid-column:1/-1;
+      display:flex;
+      justify-content:center;
+      margin-top:-8px;
+    }
+    .btn-analyze {
+      display:flex;
+      align-items:center;
+      gap:10px;
+      background:var(--amber);
+      color:#fff;
+      border:none;
+      border-radius:12px;
+      font-family:'Bricolage Grotesque',sans-serif;
+      font-size:1rem;
+      font-weight:700;
+      padding:14px 40px;
+      cursor:pointer;
+      transition:all 0.2s;
+      box-shadow:0 4px 20px rgba(245,158,11,0.3);
+      letter-spacing:0.01em;
+    }
+    .btn-analyze:hover { background:var(--amber-dark); transform:translateY(-2px); box-shadow:0 8px 28px rgba(245,158,11,0.35); }
+    .btn-analyze:disabled { background:#d1d0c8; cursor:not-allowed; transform:none; box-shadow:none; }
+    .btn-analyze.loading { pointer-events:none; }
+
+    /* Spinner */
+    .spinner {
+      width:18px; height:18px;
+      border:2.5px solid rgba(255,255,255,0.3);
+      border-top-color:#fff;
+      border-radius:50%;
+      animation:spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform:rotate(360deg); } }
+
+    /* ── RESULTS SECTION ── */
+    .results {
+      grid-column:1/-1;
+      display:none;
+      animation:slideUp 0.4s ease;
+    }
+    .results.show { display:block; }
+    @keyframes slideUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+
+    /* ── SCORE HEADER ── */
+    .score-header {
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:16px;
+      box-shadow:var(--shadow);
+      padding:32px;
+      display:grid;
+      grid-template-columns:auto 1fr auto;
+      gap:32px;
+      align-items:center;
+      margin-bottom:20px;
+    }
+
+    /* Score ring */
+    .score-ring-wrap { position:relative; width:120px; height:120px; flex-shrink:0; }
+    .score-ring-wrap svg { transform:rotate(-90deg); }
+    .score-ring-bg { fill:none; stroke:var(--bg2); stroke-width:8; }
+    .score-ring-fill {
+      fill:none;
+      stroke:var(--amber);
+      stroke-width:8;
+      stroke-linecap:round;
+      stroke-dasharray:314;
+      stroke-dashoffset:314;
+      transition:stroke-dashoffset 1.4s cubic-bezier(0.4,0,0.2,1);
+    }
+    .score-ring-fill.green { stroke:var(--green); }
+    .score-ring-fill.red { stroke:var(--red); }
+    .score-center {
+      position:absolute;
+      inset:0;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+    }
+    .score-number {
+      font-family:'Geist Mono',monospace;
+      font-size:2rem;
+      font-weight:600;
+      line-height:1;
+    }
+    .score-label { font-size:0.65rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.08em; margin-top:2px; }
+
+    .score-info h2 {
+      font-family:'Bricolage Grotesque',sans-serif;
+      font-size:1.5rem;
+      font-weight:700;
+      margin-bottom:6px;
+    }
+    .score-info p { color:var(--muted); font-size:0.9rem; line-height:1.6; }
+
+    .verdict-badge {
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      gap:6px;
+      padding:16px 20px;
+      border-radius:12px;
+      text-align:center;
+      min-width:130px;
+    }
+    .verdict-badge.strong { background:#dcfce7; color:#15803d; }
+    .verdict-badge.possible { background:#fef9c3; color:#a16207; }
+    .verdict-badge.weak { background:#fee2e2; color:#b91c1c; }
+    .verdict-icon { font-size:1.6rem; }
+    .verdict-text {
+      font-family:'Bricolage Grotesque',sans-serif;
+      font-size:0.75rem;
+      font-weight:700;
+      text-transform:uppercase;
+      letter-spacing:0.08em;
+    }
+
+    /* ── MINI SCORES ROW ── */
+    .mini-scores {
+      display:grid;
+      grid-template-columns:repeat(3,1fr);
+      gap:12px;
+      margin-bottom:20px;
+    }
+    .mini-score-card {
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:12px;
+      padding:18px 20px;
+      box-shadow:var(--shadow);
+    }
+    .mini-score-label {
+      font-family:'Bricolage Grotesque',sans-serif;
+      font-size:0.7rem;
+      font-weight:700;
+      text-transform:uppercase;
+      letter-spacing:0.08em;
+      color:var(--muted);
+      margin-bottom:8px;
+    }
+    .mini-score-val {
+      font-family:'Geist Mono',monospace;
+      font-size:1.5rem;
+      font-weight:600;
+      margin-bottom:6px;
+    }
+    .mini-score-bar {
+      height:4px;
+      background:var(--bg2);
+      border-radius:2px;
+      overflow:hidden;
+    }
+    .mini-score-bar-fill {
+      height:100%;
+      border-radius:2px;
+      background:var(--amber);
+      width:0%;
+      transition:width 1.2s cubic-bezier(0.4,0,0.2,1);
+    }
+
+    /* ── RESULTS GRID ── */
+    .results-grid {
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:16px;
+    }
+    .result-card {
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:16px;
+      padding:24px;
+      box-shadow:var(--shadow);
+      animation:slideUp 0.4s ease both;
+    }
+    .result-card:nth-child(1){animation-delay:0.05s}
+    .result-card:nth-child(2){animation-delay:0.1s}
+    .result-card:nth-child(3){animation-delay:0.15s}
+    .result-card:nth-child(4){animation-delay:0.2s}
+    .result-card:nth-child(5){animation-delay:0.25s; grid-column:1/-1}
+
+    .result-card-title {
+      font-family:'Bricolage Grotesque',sans-serif;
+      font-size:0.75rem;
+      font-weight:700;
+      text-transform:uppercase;
+      letter-spacing:0.1em;
+      color:var(--muted);
+      display:flex;
+      align-items:center;
+      gap:8px;
+      margin-bottom:16px;
+    }
+    .result-card-title .dot {
+      width:8px; height:8px;
+      border-radius:50%;
+      flex-shrink:0;
+    }
+    .dot-green { background:var(--green); }
+    .dot-red { background:var(--red); }
+    .dot-amber { background:var(--amber); }
+    .dot-blue { background:var(--blue); }
+
+    /* Tags for keywords */
+    .tags-wrap { display:flex; flex-wrap:wrap; gap:8px; }
+    .tag {
+      font-family:'Geist Mono',monospace;
+      font-size:0.72rem;
+      font-weight:500;
+      padding:4px 10px;
+      border-radius:6px;
+    }
+    .tag-missing { background:#fee2e2; color:#b91c1c; }
+    .tag-present { background:#dcfce7; color:#15803d; }
+
+    /* List items */
+    .result-list { list-style:none; display:flex; flex-direction:column; gap:10px; }
+    .result-list li {
+      display:flex;
+      gap:10px;
+      font-size:0.875rem;
+      line-height:1.6;
+      color:var(--text);
+    }
+    .result-list li .li-icon {
+      flex-shrink:0;
+      margin-top:3px;
+    }
+
+    /* Suggestions with copy button */
+    .suggestion-item {
+      background:var(--bg2);
+      border:1px solid var(--border);
+      border-radius:10px;
+      padding:14px 16px;
+      margin-bottom:10px;
+      font-size:0.875rem;
+      line-height:1.6;
+      position:relative;
+    }
+    .suggestion-item:last-child { margin-bottom:0; }
+    .suggestion-label {
+      font-family:'Bricolage Grotesque',sans-serif;
+      font-size:0.65rem;
+      font-weight:700;
+      text-transform:uppercase;
+      letter-spacing:0.08em;
+      color:var(--muted);
+      margin-bottom:6px;
+    }
+    .suggestion-old { color:var(--red); text-decoration:line-through; margin-bottom:6px; font-style:italic; }
+    .suggestion-new { color:var(--green); font-weight:500; }
+    .copy-btn {
+      position:absolute;
+      top:12px; right:12px;
+      background:none;
+      border:1px solid var(--border);
+      border-radius:6px;
+      padding:3px 8px;
+      font-family:'Geist Mono',monospace;
+      font-size:0.65rem;
+      color:var(--muted);
+      cursor:pointer;
+      transition:all 0.15s;
+    }
+    .copy-btn:hover { border-color:var(--amber); color:var(--amber-dark); }
+    .copy-btn.copied { border-color:var(--green); color:var(--green); }
+
+    /* ── ERROR ── */
+    .error-box {
+      grid-column:1/-1;
+      background:#fff1f2;
+      border:1px solid #fecdd3;
+      border-radius:12px;
+      padding:20px 24px;
+      display:none;
+      align-items:center;
+      gap:14px;
+      font-size:0.875rem;
+      color:#b91c1c;
+    }
+    .error-box.show { display:flex; }
+
+    /* ── LOADING STATE ── */
+    .loading-overlay {
+      grid-column:1/-1;
+      display:none;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      padding:60px 24px;
+      gap:20px;
+    }
+    .loading-overlay.show { display:flex; }
+    .loading-bar-wrap {
+      width:320px;
+      height:3px;
+      background:var(--bg2);
+      border-radius:2px;
+      overflow:hidden;
+    }
+    .loading-bar {
+      height:100%;
+      background:linear-gradient(90deg, var(--amber), var(--amber-dark));
+      border-radius:2px;
+      animation:loadBar 2s ease infinite;
+      width:40%;
+    }
+    @keyframes loadBar {
+      0%{transform:translateX(-100%)} 50%{transform:translateX(200%)} 100%{transform:translateX(200%)}
+    }
+    .loading-steps { display:flex; flex-direction:column; gap:8px; align-items:center; }
+    .loading-step {
+      font-family:'Geist Mono',monospace;
+      font-size:0.75rem;
+      color:var(--muted);
+      display:flex; align-items:center; gap:8px;
+      opacity:0;
+      animation:fadeStep 0.4s ease forwards;
+    }
+    .loading-step:nth-child(1){animation-delay:0s}
+    .loading-step:nth-child(2){animation-delay:0.8s}
+    .loading-step:nth-child(3){animation-delay:1.6s}
+    .loading-step:nth-child(4){animation-delay:2.4s}
+    @keyframes fadeStep { to{opacity:1} }
+    .step-dot { width:6px;height:6px;border-radius:50%;background:var(--amber); }
+
+    /* ── FOOTER ── */
+    .footer {
+      text-align:center;
+      padding:32px 24px;
+      color:var(--muted);
+      font-size:0.8rem;
+      border-top:1px solid var(--border);
+    }
+    .footer a { color:var(--amber-dark); text-decoration:none; }
+
+    /* ── RESPONSIVE ── */
+    @media(max-width:900px) {
+      .app-layout { grid-template-columns:1fr; }
+      .analyze-wrap { grid-column:1; }
+      .results { grid-column:1; }
+      .score-header { grid-template-columns:1fr; text-align:center; justify-items:center; gap:20px; }
+      .mini-scores { grid-template-columns:1fr; }
+      .results-grid { grid-template-columns:1fr; }
+      .result-card:nth-child(5) { grid-column:1; }
+    }
+    @media(max-width:600px) {
+      .navbar { padding:0 16px; }
+      .hero { padding:40px 16px 28px; }
+      .app-layout { padding:0 16px 60px; }
+      .score-header { padding:20px; }
+      .result-card { padding:18px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- NAVBAR -->
+  <nav class="navbar">
+    <div class="nav-logo">
+      <div class="nav-logo-icon">R</div>
+      ScoreMyCV
+    </div>
+    <span class="nav-badge">POWERED BY CLAUDE</span>
+  </nav>
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="hero-tag">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+      AI-Powered Analysis
+    </div>
+    <h1>Get your resume <span>job ready</span> in seconds</h1>
+    <p>Paste your resume and a job description. Claude AI will analyze the match, find keyword gaps and give you specific improvements to land more interviews.</p>
+  </div>
+
+  <!-- APP -->
+  <div class="app-layout">
+
+    <!-- RESUME INPUT -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 7h8M8 11h8M8 15h5"/></svg>
+          Your Resume
+        </div>
+      </div>
+      <div class="textarea-wrap">
+        <textarea id="resumeText" placeholder="Paste your full resume here — work experience, skills, education, everything..." oninput="updateCount('resumeText','resumeCount')"></textarea>
+        <div class="char-count"><span id="resumeCount">0</span> characters</div>
+      </div>
+    </div>
+
+    <!-- JOB DESCRIPTION INPUT -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><path d="M12 12v4M10 14h4"/></svg>
+          Job Description
+        </div>
+      </div>
+      <div class="textarea-wrap">
+        <textarea id="jobText" placeholder="Paste the job description you're applying for — requirements, responsibilities, qualifications..." oninput="updateCount('jobText','jobCount')"></textarea>
+        <div class="char-count"><span id="jobCount">0</span> characters</div>
+      </div>
+    </div>
+
+    <!-- ANALYZE BUTTON -->
+    <div class="analyze-wrap">
+      <button class="btn-analyze" id="analyzeBtn" onclick="analyzeResume()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+        </svg>
+        Analyze Resume
+      </button>
+    </div>
+
+    <!-- ERROR -->
+    <div class="error-box" id="errorBox">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" flex-shrink="0"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+      <span id="errorMsg">Something went wrong. Please try again.</span>
+    </div>
+
+    <!-- LOADING -->
+    <div class="loading-overlay" id="loadingOverlay">
+      <div style="font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:1rem;margin-bottom:4px">Analyzing your resume...</div>
+      <div class="loading-bar-wrap"><div class="loading-bar"></div></div>
+      <div class="loading-steps" id="loadingSteps"></div>
+    </div>
+
+    <!-- RESULTS -->
+    <div class="results" id="resultsSection"></div>
+
+  </div>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    Built with Claude AI &mdash; <a href="#">ScoreMyCV</a> &copy; 2026
+  </footer>
+
+<script>
+/* ─────────────────────────────
+   HELPERS
+───────────────────────────── */
+function updateCount(textareaId, countId) {
+  document.getElementById(countId).textContent =
+    document.getElementById(textareaId).value.length.toLocaleString();
+}
+
+function showError(msg) {
+  const box = document.getElementById('errorBox');
+  document.getElementById('errorMsg').textContent = msg;
+  box.classList.add('show');
+  setTimeout(() => box.classList.remove('show'), 6000);
+}
+
+function setLoading(on) {
+  const btn = document.getElementById('analyzeBtn');
+  const overlay = document.getElementById('loadingOverlay');
+  if (on) {
+    btn.disabled = true;
+    btn.classList.add('loading');
+    btn.innerHTML = `<div class="spinner"></div> Analyzing...`;
+    overlay.classList.add('show');
+    animateLoadingSteps();
+  } else {
+    btn.disabled = false;
+    btn.classList.remove('loading');
+    btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg> Analyze Resume`;
+    overlay.classList.remove('show');
+  }
+}
+
+function animateLoadingSteps() {
+  const steps = [
+    'Reading resume content...',
+    'Scanning job requirements...',
+    'Matching keywords and skills...',
+    'Generating recommendations...',
+  ];
+  const container = document.getElementById('loadingSteps');
+  container.innerHTML = '';
+  steps.forEach((step, i) => {
+    const el = document.createElement('div');
+    el.className = 'loading-step';
+    el.style.animationDelay = (i * 0.8) + 's';
+    el.innerHTML = `<div class="step-dot"></div>${step}`;
+    container.appendChild(el);
+  });
+}
+
+function copyText(text, btn) {
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+  });
+}
+
+/* ─────────────────────────────
+   SCORE RING ANIMATION
+───────────────────────────── */
+function animateRing(score) {
+  const circumference = 314;
+  const offset = circumference - (score / 100) * circumference;
+  const fill = document.querySelector('.score-ring-fill');
+  if (!fill) return;
+  fill.classList.remove('green','red');
+  if (score >= 70) fill.classList.add('green');
+  else if (score < 45) fill.classList.add('red');
+  setTimeout(() => { fill.style.strokeDashoffset = offset; }, 100);
+
+  // Animate number count up
+  const numEl = document.querySelector('.score-number');
+  if (!numEl) return;
+  let current = 0;
+  const duration = 1200;
+  const step = score / (duration / 16);
+  const timer = setInterval(() => {
+    current = Math.min(current + step, score);
+    numEl.textContent = Math.round(current);
+    if (current >= score) clearInterval(timer);
+  }, 16);
+}
+
+function animateBars() {
+  setTimeout(() => {
+    document.querySelectorAll('.mini-score-bar-fill').forEach(bar => {
+      bar.style.width = bar.dataset.pct + '%';
+    });
+  }, 200);
+}
+
+/* ─────────────────────────────
+   MAIN ANALYZE FUNCTION
+───────────────────────────── */
+async function analyzeResume() {
+  const resume = document.getElementById('resumeText').value.trim();
+  const job = document.getElementById('jobText').value.trim();
+
+  if (!resume) { showError('Please paste your resume first.'); return; }
+  if (!job) { showError('Please paste the job description.'); return; }
+  if (resume.length < 100) { showError('Resume seems too short — paste the full text.'); return; }
+  if (job.length < 50) { showError('Job description seems too short.'); return; }
+
+  document.getElementById('errorBox').classList.remove('show');
+  document.getElementById('resultsSection').classList.remove('show');
+  setLoading(true);
+
+  const prompt = `You are an expert resume analyst and career coach. Analyze the resume against the job description and return a detailed JSON analysis.
+
+RESUME:
+${resume}
+
+JOB DESCRIPTION:
+${job}
+
+Return ONLY a valid JSON object (no markdown, no backticks, no extra text) with this exact structure:
+{
+  "overallScore": <number 0-100>,
+  "atsScore": <number 0-100>,
+  "keywordScore": <number 0-100>,
+  "experienceScore": <number 0-100>,
+  "verdict": "<Strong Match|Possible Match|Weak Match>",
+  "verdictReason": "<1-2 sentence explanation of the verdict>",
+  "missingKeywords": ["<keyword1>", "<keyword2>", ...],
+  "presentKeywords": ["<keyword1>", "<keyword2>", ...],
+  "strengths": [
+    {"point": "<strength>", "detail": "<why this helps>"},
+    ...
+  ],
+  "weaknesses": [
+    {"point": "<weakness>", "detail": "<why this hurts>"},
+    ...
+  ],
+  "suggestions": [
+    {"before": "<original or weak bullet>", "after": "<improved version>", "reason": "<why this is better>"},
+    ...
+  ],
+  "quickWins": ["<actionable tip 1>", "<actionable tip 2>", ...]
+}
+
+Rules:
+- missingKeywords: 6-10 important skills/terms from the JD missing from the resume
+- presentKeywords: 5-8 good keywords the resume already has that match the JD
+- strengths: exactly 4 items
+- weaknesses: exactly 4 items
+- suggestions: exactly 3 specific bullet point rewrites
+- quickWins: exactly 4 quick actionable tips
+- Be specific and honest, not generic`;
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+
+    if (!response.ok) throw new Error('API request failed: ' + response.status);
+    const data = await response.json();
+    const text = data.content[0].text.replace(/```json|```/g, '').trim();
+    const result = JSON.parse(text);
+
+    setLoading(false);
+    renderResults(result);
+
+  } catch(e) {
+    setLoading(false);
+    console.error(e);
+    showError('Analysis failed. Please check your inputs and try again.');
+  }
+}
+
+/* ─────────────────────────────
+   RENDER RESULTS
+───────────────────────────── */
+function renderResults(r) {
+  const verdictClass = r.verdict === 'Strong Match' ? 'strong' : r.verdict === 'Possible Match' ? 'possible' : 'weak';
+  const verdictIcon = r.verdict === 'Strong Match'
+    ? `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4 12 14.01l-3-3"/></svg>`
+    : r.verdict === 'Possible Match'
+    ? `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>`
+    : `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6M9 9l6 6"/></svg>`;
+
+  const scoreColor = r.overallScore >= 70 ? 'var(--green)' : r.overallScore < 45 ? 'var(--red)' : 'var(--amber)';
+
+  const html = `
+    <!-- SCORE HEADER -->
+    <div class="score-header">
+      <div class="score-ring-wrap">
+        <svg width="120" height="120" viewBox="0 0 120 120">
+          <circle class="score-ring-bg" cx="60" cy="60" r="50"/>
+          <circle class="score-ring-fill" cx="60" cy="60" r="50"/>
+        </svg>
+        <div class="score-center">
+          <div class="score-number" style="color:${scoreColor}">0</div>
+          <div class="score-label">/ 100</div>
+        </div>
+      </div>
+
+      <div class="score-info">
+        <h2>Resume Match Analysis</h2>
+        <p>${r.verdictReason}</p>
+      </div>
+
+      <div class="verdict-badge ${verdictClass}">
+        ${verdictIcon}
+        <div class="verdict-text">${r.verdict}</div>
+      </div>
+    </div>
+
+    <!-- MINI SCORES -->
+    <div class="mini-scores">
+      <div class="mini-score-card">
+        <div class="mini-score-label">ATS Score</div>
+        <div class="mini-score-val" style="color:${r.atsScore>=70?'var(--green)':r.atsScore<45?'var(--red)':'var(--amber)'}">${r.atsScore}<span style="font-size:0.9rem;color:var(--muted)">/100</span></div>
+        <div class="mini-score-bar"><div class="mini-score-bar-fill" data-pct="${r.atsScore}" style="background:${r.atsScore>=70?'var(--green)':r.atsScore<45?'var(--red)':'var(--amber)'}"></div></div>
+      </div>
+      <div class="mini-score-card">
+        <div class="mini-score-label">Keyword Match</div>
+        <div class="mini-score-val" style="color:${r.keywordScore>=70?'var(--green)':r.keywordScore<45?'var(--red)':'var(--amber)'}">${r.keywordScore}<span style="font-size:0.9rem;color:var(--muted)">/100</span></div>
+        <div class="mini-score-bar"><div class="mini-score-bar-fill" data-pct="${r.keywordScore}" style="background:${r.keywordScore>=70?'var(--green)':r.keywordScore<45?'var(--red)':'var(--amber)'}"></div></div>
+      </div>
+      <div class="mini-score-card">
+        <div class="mini-score-label">Experience Match</div>
+        <div class="mini-score-val" style="color:${r.experienceScore>=70?'var(--green)':r.experienceScore<45?'var(--red)':'var(--amber)'}">${r.experienceScore}<span style="font-size:0.9rem;color:var(--muted)">/100</span></div>
+        <div class="mini-score-bar"><div class="mini-score-bar-fill" data-pct="${r.experienceScore}" style="background:${r.experienceScore>=70?'var(--green)':r.experienceScore<45?'var(--red)':'var(--amber)'}"></div></div>
+      </div>
+    </div>
+
+    <!-- RESULTS GRID -->
+    <div class="results-grid">
+
+      <!-- MISSING KEYWORDS -->
+      <div class="result-card">
+        <div class="result-card-title">
+          <div class="dot dot-red"></div>
+          Missing Keywords
+        </div>
+        <div class="tags-wrap">
+          ${r.missingKeywords.map(k => `<span class="tag tag-missing">${k}</span>`).join('')}
+        </div>
+      </div>
+
+      <!-- PRESENT KEYWORDS -->
+      <div class="result-card">
+        <div class="result-card-title">
+          <div class="dot dot-green"></div>
+          Keywords You Have
+        </div>
+        <div class="tags-wrap">
+          ${r.presentKeywords.map(k => `<span class="tag tag-present">${k}</span>`).join('')}
+        </div>
+      </div>
+
+      <!-- STRENGTHS -->
+      <div class="result-card">
+        <div class="result-card-title">
+          <div class="dot dot-green"></div>
+          Strengths
+        </div>
+        <ul class="result-list">
+          ${r.strengths.map(s => `
+            <li>
+              <svg class="li-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2.5" stroke-linecap="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4 12 14.01l-3-3"/></svg>
+              <div><strong>${s.point}</strong> — ${s.detail}</div>
+            </li>`).join('')}
+        </ul>
+      </div>
+
+      <!-- WEAKNESSES -->
+      <div class="result-card">
+        <div class="result-card-title">
+          <div class="dot dot-red"></div>
+          Areas to Improve
+        </div>
+        <ul class="result-list">
+          ${r.weaknesses.map(w => `
+            <li>
+              <svg class="li-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6M9 9l6 6"/></svg>
+              <div><strong>${w.point}</strong> — ${w.detail}</div>
+            </li>`).join('')}
+        </ul>
+      </div>
+
+      <!-- SUGGESTIONS -->
+      <div class="result-card">
+        <div class="result-card-title">
+          <div class="dot dot-amber"></div>
+          Rewrite Suggestions
+        </div>
+        ${r.suggestions.map((s, i) => `
+          <div class="suggestion-item">
+            <button class="copy-btn" onclick="copyText(${JSON.stringify(s.after)}, this)">Copy</button>
+            <div class="suggestion-label">Before</div>
+            <div class="suggestion-old">${s.before}</div>
+            <div class="suggestion-label">After</div>
+            <div class="suggestion-new">${s.after}</div>
+            <div style="font-size:0.78rem;color:var(--muted);margin-top:8px;font-style:italic">${s.reason}</div>
+          </div>`).join('')}
+      </div>
+
+    </div>
+
+    <!-- QUICK WINS -->
+    <div class="result-card" style="margin-top:16px;animation:slideUp 0.4s ease 0.3s both">
+      <div class="result-card-title">
+        <div class="dot dot-blue"></div>
+        Quick Wins — Do These First
+      </div>
+      <ul class="result-list">
+        ${r.quickWins.map(tip => `
+          <li>
+            <svg class="li-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2.5" stroke-linecap="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            <div>${tip}</div>
+          </li>`).join('')}
+      </ul>
+    </div>
+  `;
+
+  const section = document.getElementById('resultsSection');
+  section.innerHTML = html;
+  section.classList.add('show');
+
+  // Scroll to results
+  setTimeout(() => section.scrollIntoView({ behavior:'smooth', block:'start' }), 100);
+
+  // Animate score ring and bars
+  setTimeout(() => animateRing(r.overallScore), 200);
+  setTimeout(() => animateBars(), 300);
+}
+</script>
+</body>
+</html>
