@@ -36,6 +36,8 @@
       --shadow-lg:0 8px 40px rgba(0,0,0,0.1);
     }
 
+
+
     /* ── NAVBAR ── */
     .navbar {
       position:sticky; top:0; z-index:100;
@@ -821,35 +823,27 @@ Rules:
 - Be specific and honest, not generic`;
 
   // Build prompt — prepend image instruction if image uploaded
-  const prompt = uploadedImageBase64
-    ? 'The image provided is the candidate\'s CV/resume. Extract all information from it visually. ' + basePrompt.replace('RESUME:\n' + resume + '\n\n', '')
-    : basePrompt;
+  // Groq doesn't support image input - if image uploaded, ask user to use the text box
+  if (uploadedImageBase64 && !resume) {
+    setLoading(false);
+    showError('Image upload requires the Anthropic API. Please copy your CV text and paste it in the text box instead.');
+    return;
+  }
+  const prompt = basePrompt;
 
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const response = await fetch('/api/analyze', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
-      body: JSON.stringify({
-        model: 'claude-opus-4-6',
-        max_tokens: 4000,
-        messages: [{
-          role: 'user',
-          content: uploadedImageBase64
-            ? [
-                {
-                  type: 'image',
-                  source: { type: 'base64', media_type: uploadedImageType, data: uploadedImageBase64 }
-                },
-                { type: 'text', text: prompt }
-              ]
-            : prompt
-        }]
-      })
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt })
     });
 
-    if (!response.ok) throw new Error('API request failed: ' + response.status);
+    if (!response.ok) {
+      const errData = await response.json().catch(() => ({}));
+      throw new Error(errData.error || 'Server error ' + response.status);
+    }
     const data = await response.json();
-    let text = data.content[0].text;
+    let text = data.result;
 
     // Extract JSON — find first { to last } in case Claude adds extra text
     const firstBrace = text.indexOf('{');
