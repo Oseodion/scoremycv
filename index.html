@@ -823,19 +823,17 @@ Rules:
 - Be specific and honest, not generic`;
 
   // Build prompt — prepend image instruction if image uploaded
-  // Groq doesn't support image input - if image uploaded, ask user to use the text box
-  if (uploadedImageBase64 && !resume) {
-    setLoading(false);
-    showError('Image upload requires the Anthropic API. Please copy your CV text and paste it in the text box instead.');
-    return;
-  }
   const prompt = basePrompt;
 
   try {
     const response = await fetch('/api/analyze', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt })
+      body: JSON.stringify({
+        prompt,
+        imageBase64: uploadedImageBase64 || null,
+        imageType: uploadedImageType || null
+      })
     });
 
     if (!response.ok) {
